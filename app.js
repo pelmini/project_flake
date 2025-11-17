@@ -15,7 +15,7 @@ const CONFIG = {
         { pos: 0.50, color: 0xCC6812 }, // Rust (covers ~2/3 from top)
         { pos: 0.80, color: 0xE09555 }, // Transition hue (more orange, between Rust and Earth Yellow)
         { pos: 0.85, color: 0xDF9C60 }, // Earth Yellow
-        { pos: 0.95, color: 0xF5E6D3 }  // Very light cream
+        { pos: 0.95, color: 0xEACBA3 }  // Very light cream
     ],
     backgroundGradient: {
         center: '#eee1ba',
