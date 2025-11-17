@@ -1,0 +1,611 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3D Croissant Model</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: #9c634f;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+        }
+
+        .container {
+            width: 100%;
+            height: 100vh;
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+
+        h1 {
+            color: #eee1ba;
+            font-size: 2.5rem;
+            margin-bottom: 1rem;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+            z-index: 10;
+            font-weight: 600;
+        }
+
+        .canvas-container {
+            width: 90%;
+            max-width: 800px;
+            height: 70vh;
+            border-radius: 20px;
+            overflow: hidden;
+            box-shadow: 
+                0 30px 80px rgba(0, 0, 0, 0.4),
+                0 15px 40px rgba(0, 0, 0, 0.3),
+                0 0 0 1px rgba(156, 99, 79, 0.3),
+                inset 0 0 60px rgba(156, 99, 79, 0.2);
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(156, 99, 79, 0.4);
+        }
+
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+
+        .instructions {
+            color: #eee1ba;
+            margin-top: 1rem;
+            text-align: center;
+            font-size: 0.9rem;
+            opacity: 1;
+            z-index: 10;
+            font-weight: 500;
+        }
+
+        .error-message {
+            color: #ff6b6b;
+            background: rgba(255, 255, 255, 0.95);
+            padding: 1.5rem;
+            border-radius: 10px;
+            max-width: 600px;
+            margin: 1rem;
+            text-align: left;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+            z-index: 10;
+            display: none;
+        }
+
+        .error-message.show {
+            display: block;
+        }
+
+        .error-message h2 {
+            color: #d63031;
+            margin-bottom: 0.5rem;
+            font-size: 1.2rem;
+        }
+
+        .error-message p {
+            color: #2d3436;
+            margin: 0.5rem 0;
+            line-height: 1.6;
+        }
+
+        .error-message code {
+            background: #f1f2f6;
+            padding: 0.2rem 0.4rem;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+            color: #2d3436;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>3D Croissant Model</h1>
+        <div class="canvas-container">
+            <canvas id="canvas"></canvas>
+        </div>
+        <p class="instructions">Click and drag to rotate • Scroll to zoom • Single click to stop rotation • Double click to start rotation</p>
+        <div class="error-message" id="errorMessage">
+            <h2>⚠️ CORS Error</h2>
+            <p>Browsers block loading local files when opening HTML directly. You need to use a local web server.</p>
+            <p><strong>Quick fix:</strong> Run one of these commands in the project directory:</p>
+            <p><code>python3 -m http.server 8000</code></p>
+            <p>or</p>
+            <p><code>npx serve</code></p>
+            <p>Then open <code>http://localhost:8000</code> in your browser.</p>
+        </div>
+    </div>
+
+    <script>
+        // Early logging to verify script execution
+        console.log('Page loaded, scripts starting...');
+        window.addEventListener('error', (e) => {
+            console.error('JavaScript error:', e.error, e.message, e.filename, e.lineno);
+        });
+    </script>
+
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+                "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+            }
+        }
+    </script>
+
+    <script type="module">
+        console.log('Module script started loading...');
+        
+        import * as THREE from 'three';
+        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+        import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+
+        console.log('Three.js imported successfully');
+
+        // Scene setup
+        const scene = new THREE.Scene();
+        // Create a gradient background using the provided color scheme
+        const canvasBg = document.createElement('canvas');
+        canvasBg.width = 512;
+        canvasBg.height = 512;
+        const ctxBg = canvasBg.getContext('2d');
+        
+        // Create a radial gradient using the color scheme
+        const gradient = ctxBg.createRadialGradient(256, 256, 0, 256, 256, 360);
+        gradient.addColorStop(0, '#eee1ba');    // Very light cream at center
+        gradient.addColorStop(0.5, '#eee1ba');  // Keep light cream longer
+        gradient.addColorStop(0.7, '#f0d7a7');  // Light beige transition
+        gradient.addColorStop(0.9, '#c37960');  // Medium brown/terracotta at edges
+        
+        ctxBg.fillStyle = gradient;
+        ctxBg.fillRect(0, 0, 512, 512);
+        
+        const bgTexture = new THREE.CanvasTexture(canvasBg);
+        bgTexture.colorSpace = THREE.SRGBColorSpace;
+        scene.background = bgTexture;
+        console.log('Scene created with custom color scheme gradient background');
+
+        // Camera setup
+        const camera = new THREE.PerspectiveCamera(
+            75,
+            window.innerWidth / window.innerHeight,
+            0.1,
+            1000
+        );
+        
+        // Set initial camera position based on azimuth and polar angles
+        const initialDistance = 2.3; // Zoom level
+        const azimuth = 90 * Math.PI / 180; // Convert to radians
+        const polar = 70 * Math.PI / 180; // Convert to radians
+        
+        // Convert spherical coordinates to Cartesian
+        const x = initialDistance * Math.sin(polar) * Math.sin(azimuth);
+        const y = initialDistance * Math.cos(polar);
+        const z = initialDistance * Math.sin(polar) * Math.cos(azimuth);
+        
+        camera.position.set(2.3, y, z);
+
+        // Renderer setup
+        const canvas = document.getElementById('canvas');
+        const container = canvas.parentElement;
+        const renderer = new THREE.WebGLRenderer({ 
+            canvas: canvas,
+            antialias: true,
+            powerPreference: "high-performance"
+        });
+        renderer.setSize(container.clientWidth, container.clientHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2)); // Limit pixel ratio for performance
+        renderer.shadowMap.enabled = true;
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap; // Softer shadows
+        
+        // Color space settings to match Blender
+        renderer.outputColorSpace = THREE.SRGBColorSpace;
+        renderer.toneMapping = THREE.ACESFilmicToneMapping;
+        renderer.toneMappingExposure = 1.4; // Increased for brighter appearance
+
+        // Lighting - brighter setup for croissant
+        const ambientLight = new THREE.AmbientLight(0xffffff, 1.3); // Increased for brighter appearance
+        scene.add(ambientLight);
+
+        const directionalLight1 = new THREE.DirectionalLight(0xffffff, 0.7); // Increased
+        directionalLight1.position.set(5, 5, 5);
+        directionalLight1.castShadow = true;
+        scene.add(directionalLight1);
+
+        const directionalLight2 = new THREE.DirectionalLight(0xffffff, 0.6); // Increased
+        directionalLight2.position.set(-5, 3, -5);
+        scene.add(directionalLight2);
+        
+        // Add a subtle fill light from below
+        const fillLight = new THREE.DirectionalLight(0xffffff, 0.6); // Increased
+        fillLight.position.set(0, -3, 2);
+        scene.add(fillLight);
+
+        // Controls
+        const controls = new OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.05;
+        controls.minDistance = 2;
+        controls.maxDistance = 10;
+        
+        // Log zoom and rotation when user adjusts the croissant
+        let lastZoom = null;
+        let lastAzimuth = null;
+        let lastPolar = null;
+        
+        controls.addEventListener('change', () => {
+            // Calculate zoom level (distance from camera to target)
+            const zoomLevel = camera.position.distanceTo(controls.target);
+            
+            // Calculate camera rotation angles (spherical coordinates)
+            const direction = new THREE.Vector3();
+            direction.subVectors(camera.position, controls.target).normalize();
+            
+            // Azimuth angle (horizontal rotation around Y-axis) in degrees
+            const azimuth = Math.atan2(direction.x, direction.z) * 180 / Math.PI;
+            
+            // Polar angle (vertical rotation, elevation) in degrees
+            const polar = Math.acos(direction.y) * 180 / Math.PI;
+            
+            // Only log if values changed (to avoid spam)
+            const zoomChanged = lastZoom === null || Math.abs(lastZoom - zoomLevel) > 0.01;
+            const azimuthChanged = lastAzimuth === null || Math.abs(lastAzimuth - azimuth) > 0.1;
+            const polarChanged = lastPolar === null || Math.abs(lastPolar - polar) > 0.1;
+            
+            if (zoomChanged || azimuthChanged || polarChanged) {
+                console.log('Croissant view adjusted:');
+                console.log(`  Zoom level: ${zoomLevel.toFixed(2)}`);
+                console.log(`  Azimuth (horizontal): ${azimuth.toFixed(2)}°`);
+                console.log(`  Polar (vertical): ${polar.toFixed(2)}°`);
+                lastZoom = zoomLevel;
+                lastAzimuth = azimuth;
+                lastPolar = polar;
+            }
+        });
+
+        // Load the 3D model
+        console.log('Creating GLTFLoader...');
+        const loader = new GLTFLoader();
+        let model = null;
+
+        console.log('Attempting to load: ./croissant_3d.glb');
+        loader.load(
+            './croissant_3d.glb',
+            (gltf) => {
+                console.log('Model loaded successfully:', gltf);
+                model = gltf.scene;
+                
+                // Check if model has any children
+                console.log('Model children:', model.children.length);
+                console.log('Model scene:', model);
+                
+                // Define Blender Color Ramp stops (normalized 0->1)
+                // Note: Due to inverted Z mapping (1 - normalizedZ), higher positions = front
+                // Improved color ramp for more realistic croissant appearance:
+                const colorStops = [
+                    { pos: 0.30, color: new THREE.Color(0xB9480B) }, // Rich dark orange-brown
+                    { pos: 0.45, color: new THREE.Color(0xC8642F) }, // Medium orange-brown
+                    { pos: 0.60, color: new THREE.Color(0xDF8636) }, // Medium orange-brown
+                    { pos: 0.75, color: new THREE.Color(0xF0A768) }, // Golden tan-brown
+                    { pos: 0.90, color: new THREE.Color(0xF5E6D3) } // Very light-cream at front
+                ];
+                
+                // Function to interpolate color between stops
+                function getColorAtPosition(t) {
+                    t = Math.max(0, Math.min(1, t)); // Clamp t to [0,1]
+                    
+                    for (let i = 0; i < colorStops.length - 1; i++) {
+                        if (t >= colorStops[i].pos && t <= colorStops[i + 1].pos) {
+                            const tLocal = (t - colorStops[i].pos) / (colorStops[i + 1].pos - colorStops[i].pos);
+                            const color = new THREE.Color();
+                            color.lerpColors(colorStops[i].color, colorStops[i + 1].color, tLocal);
+                            return color;
+                        }
+                    }
+                    
+                    if (t <= colorStops[0].pos) return colorStops[0].color;
+                    if (t >= colorStops[colorStops.length - 1].pos) return colorStops[colorStops.length - 1].color;
+                    return colorStops[0].color;
+                }
+                
+                // Traverse the loaded GLB model
+                let meshCount = 0;
+                let materialCount = 0;
+                model.traverse((child) => {
+                    if (child.isMesh) {
+                        meshCount++;
+                        console.log('Found mesh:', child.name, child);
+                        
+                        // Smooth out the geometry
+                        if (child.geometry) {
+                            // Compute vertex normals for smooth shading
+                            child.geometry.computeVertexNormals();
+                            // Ensure smooth shading
+                            child.geometry.normalizeNormals();
+                            
+                            // Additional smoothing: merge vertices that are very close
+                            // This helps reduce faceting and creates smoother surfaces
+                            if (child.geometry.attributes.position) {
+                                // Force smooth normals by recomputing with angle threshold
+                                child.geometry.computeVertexNormals();
+                            }
+                        }
+                        
+                        // Ensure geometry has vertex positions
+                        const geometry = child.geometry;
+                        if (!geometry.attributes.position) return;
+                        
+                        // Compute bounding box to determine main axis (Z in this example)
+                        geometry.computeBoundingBox();
+                        const bbox = geometry.boundingBox;
+                        const minZ = bbox.min.z;
+                        const maxZ = bbox.max.z;
+                        const rangeZ = maxZ - minZ;
+                        
+                        const positions = geometry.attributes.position;
+                        const colors = [];
+                        
+                        // Assign colors based on vertex Z position along croissant length
+                        for (let i = 0; i < positions.count; i++) {
+                            const z = positions.getZ(i);
+                            // Invert the normalized value to flip the color order
+                            let normalizedZ = rangeZ > 0 ? 1 - (z - minZ) / rangeZ : 0.5;
+                            
+                            // Apply non-linear mapping to concentrate more color at the back
+                            // Using power function: lower exponent = more color at back (0.5-0.7 works well)
+                            normalizedZ = Math.pow(normalizedZ, 0.6); // Adjust this value (0.3-0.8) to control distribution
+                            
+                            const color = getColorAtPosition(normalizedZ);
+                            colors.push(color.r, color.g, color.b);
+                        }
+                        
+                        // Set vertex colors
+                        geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+                        geometry.attributes.color.needsUpdate = true;
+                        console.log('Applied vertex color gradient along croissant length');
+                        
+                        // Enable shadows
+                        child.castShadow = true;
+                        child.receiveShadow = true;
+                        
+                        // Update material to use vertex colors
+                        if (child.material) {
+                            // Handle both single materials and arrays
+                            const materials = Array.isArray(child.material) ? child.material : [child.material];
+                            materials.forEach((material) => {
+                                materialCount++;
+                                console.log('Material found:', material.name, material);
+                                
+                                material.vertexColors = true; // Enable vertex colors
+                                material.roughness = 0.5; // Lower roughness = smoother, more reflective surface
+                                material.metalness = 0.0;
+                                material.flatShading = false; // Smooth shading (not flat/faceted)
+                                
+                                // Ensure smooth interpolation
+                                if (material.side !== undefined) {
+                                    material.side = THREE.FrontSide; // Render both sides smoothly
+                                }
+                                
+                                // Set base color to white so vertex colors show through
+                                material.color.setHex(0xFFFFFF);
+                                
+                                // Optional: Add a subtle emissive glow for warmth
+                                material.emissive.setHex(0x8B6F47);
+                                material.emissiveIntensity = 0.25; // Increased for brighter appearance
+                                
+                                material.needsUpdate = true;
+                            });
+                        } else {
+                            console.warn('Mesh has no material:', child.name);
+                            // Create a default material if none exists
+                            child.material = new THREE.MeshStandardMaterial({
+                                color: 0xFFFFFF,
+                                vertexColors: true,
+                                roughness: 0.5,
+                                metalness: 0.0
+                            });
+                            console.log('Created default material for:', child.name);
+                        }
+                    }
+                });
+                
+                console.log('Total materials found:', materialCount);
+                console.log('Total meshes found:', meshCount);
+                
+                if (meshCount === 0) {
+                    console.error('No meshes found in the model! The GLB file might be empty or corrupted.');
+                    alert('Warning: No 3D geometry found in the model. Please check your Blender export settings:\n\n1. Make sure the croissant object is selected\n2. Check "Include" > "Selected Objects" in export settings\n3. Ensure the object has geometry (not just an empty object)');
+                    return;
+                }
+                
+                scene.add(model);
+
+                // Center and scale the model
+                const box = new THREE.Box3().setFromObject(model);
+                const center = box.getCenter(new THREE.Vector3());
+                const size = box.getSize(new THREE.Vector3());
+                
+                console.log('Model bounding box:', { center, size });
+                
+                // Check if bounding box is valid
+                if (size.x === 0 && size.y === 0 && size.z === 0) {
+                    console.error('Model has zero size!');
+                    alert('Warning: The model appears to have no size. Please check your Blender export.');
+                    return;
+                }
+                
+                const maxDim = Math.max(size.x, size.y, size.z);
+                const scale = 2 / maxDim;
+                model.scale.multiplyScalar(scale);
+                
+                model.position.x = -center.x * scale;
+                model.position.y = -center.y * scale;
+                model.position.z = -center.z * scale;
+
+                // Update camera to look at the model
+                controls.target.copy(model.position);
+                controls.update();
+                
+                console.log('Model positioned and scaled successfully');
+                
+                // Continuous rotation animation - will be handled in main animation loop
+                window.croissantRotation = {
+                    isRotating: true,
+                    rotationSpeed: 0.003, // radians per frame (adjust for speed - lower = slower)
+                    rotationAngle: 0
+                };
+                
+                // Stop rotation function
+                let stopRotation = () => {
+                    if (window.croissantRotation && window.croissantRotation.isRotating) {
+                        window.croissantRotation.isRotating = false;
+                        console.log('Rotation stopped');
+                    }
+                };
+                
+                // Start rotation function
+                let startRotation = () => {
+                    if (window.croissantRotation && !window.croissantRotation.isRotating) {
+                        window.croissantRotation.isRotating = true;
+                        console.log('Rotation started');
+                    }
+                };
+                
+                // Track if user is dragging
+                let isUserDragging = false;
+                
+                controls.addEventListener('start', () => {
+                    isUserDragging = true;
+                    // Stop rotation when dragging starts
+                    stopRotation();
+                });
+                
+                controls.addEventListener('end', () => {
+                    // Wait a bit before allowing clicks
+                    setTimeout(() => {
+                        isUserDragging = false;
+                    }, 150);
+                });
+                
+                // Handle clicks: single click stops, double click starts
+                let lastClickTime = 0;
+                const DOUBLE_CLICK_TIME = 300; // milliseconds
+                let clickTimeout = null;
+                
+                window.addEventListener('click', (e) => {
+                    // Don't handle if user was dragging
+                    if (isUserDragging) {
+                        return;
+                    }
+                    
+                    const now = Date.now();
+                    const timeSinceLastClick = now - lastClickTime;
+                    
+                    if (timeSinceLastClick < DOUBLE_CLICK_TIME && timeSinceLastClick > 0) {
+                        // This is a double click - start rotation
+                        if (clickTimeout) {
+                            clearTimeout(clickTimeout);
+                            clickTimeout = null;
+                        }
+                        startRotation();
+                        lastClickTime = 0; // Reset to prevent triple-click
+                    } else {
+                        // This might be a single click - wait to see if another click comes
+                        lastClickTime = now;
+                        if (clickTimeout) {
+                            clearTimeout(clickTimeout);
+                        }
+                        clickTimeout = setTimeout(() => {
+                            // No second click came, so this was a single click - stop rotation
+                            stopRotation();
+                            clickTimeout = null;
+                        }, DOUBLE_CLICK_TIME);
+                    }
+                });
+                
+                // Also handle native double-click event as backup
+                window.addEventListener('dblclick', (e) => {
+                    if (isUserDragging) {
+                        return;
+                    }
+                    if (clickTimeout) {
+                        clearTimeout(clickTimeout);
+                        clickTimeout = null;
+                    }
+                    startRotation();
+                });
+            },
+            (progress) => {
+                if (progress.lengthComputable) {
+                    const percentComplete = (progress.loaded / progress.total * 100);
+                    console.log('Loading progress:', percentComplete.toFixed(2) + '%');
+                } else {
+                    console.log('Loading progress:', progress.loaded, 'bytes loaded');
+                }
+            },
+            (error) => {
+                console.error('Error loading model:', error);
+                console.error('Error details:', error.message, error);
+                const errorMessage = document.getElementById('errorMessage');
+                let errorText = 'Error loading 3D model. ';
+                
+                if (error.message) {
+                    errorText += '\n\nError: ' + error.message;
+                }
+                
+                errorText += '\n\nPossible issues:\n';
+                errorText += '1. The GLB file might be corrupted or empty\n';
+                errorText += '2. Check Blender export settings - make sure the object is selected and exported\n';
+                errorText += '3. Try re-exporting from Blender with default settings first';
+                
+                if (errorMessage) {
+                    errorMessage.innerHTML = '<h2>⚠️ Model Loading Error</h2><p>' + errorText.replace(/\n/g, '<br>') + '</p>';
+                    errorMessage.classList.add('show');
+                } else {
+                    alert(errorText);
+                }
+            }
+        );
+
+        // Handle window resize
+        window.addEventListener('resize', () => {
+            const width = container.clientWidth;
+            const height = container.clientHeight;
+            
+            camera.aspect = width / height;
+            camera.updateProjectionMatrix();
+            renderer.setSize(width, height);
+        });
+
+        // Animation loop
+        function animate() {
+            requestAnimationFrame(animate);
+            
+            // Continuous rotation if enabled
+            if (window.croissantRotation && window.croissantRotation.isRotating && model) {
+                window.croissantRotation.rotationAngle += window.croissantRotation.rotationSpeed;
+                model.rotation.y = window.croissantRotation.rotationAngle;
+            }
+            
+            controls.update();
+            renderer.render(scene, camera);
+        }
+
+        animate();
+    </script>
+</body>
+</html>
+
