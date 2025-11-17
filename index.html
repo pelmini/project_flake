@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3D Croissant Model</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <h1>3D Croissant Model</h1>
+        <div class="canvas-container">
+            <canvas id="canvas"></canvas>
+        </div>
+        <p class="instructions">
+            Click and drag to rotate • Scroll to zoom • Single click to stop rotation • Double click to start rotation
+        </p>
+        <div class="error-message" id="errorMessage" role="alert">
+            <h2>⚠️ CORS Error</h2>
+            <p>Browsers block loading local files when opening HTML directly. You need to use a local web server.</p>
+            <p><strong>Quick fix:</strong> Run one of these commands in the project directory:</p>
+            <p><code>python3 -m http.server 8000</code></p>
+            <p>or</p>
+            <p><code>npx serve</code></p>
+            <p>Then open <code>http://localhost:8000</code> in your browser.</p>
+        </div>
+    </div>
+
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+                "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+            }
+        }
+    </script>
+
+    <script type="module" src="app.js"></script>
+</body>
+</html>
